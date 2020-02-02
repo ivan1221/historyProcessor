@@ -156,7 +156,6 @@ public class historyjson extends AbstractProcessor {
                         while (record != null) {
                             listOfMaps.clear();
                             values.clear();
-                            //Mantiene el historico y mapea los campos indicados por paramentro en el history
                             createHistory(fieldsArray, record, listOfMaps, values, record.getValue("History"), logger);
                             record.setValue("History", listOfMaps);
                             writer.write(record);
