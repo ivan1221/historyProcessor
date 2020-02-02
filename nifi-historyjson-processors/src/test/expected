@@ -36,12 +36,7 @@
   "O_Concept" : "",
   "O_Virtual_Cdr" : "",
   "O_ID" : "",
-  "History" : [ {
-    "E_Formatted" : "E",
-    "E_Error_Code" : "987",
-    "E_Formatted_Date" : "1580140025319",
-    "E_Error_Description" : "Currency code invalid"
-  }, {
+  "History" : [{
     "E_Formatted" : "E",
     "E_Error_Code" : "500",
     "E_Formatted_Date" : "1580140026000",

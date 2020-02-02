@@ -124,32 +124,56 @@ public class historyjson extends AbstractProcessor {
         try {
             session.read(flowFile, in -> {
                 try (RecordReader reader = factory.createRecordReader(flowFile, in, logger)) {
-                    final RecordSchema writeSchema = writerFactory.getSchema(null, reader.getSchema());
                     Record record;
                     final OutputStream outStream = session.write(outFlowFile);
-                    final RecordSetWriter writer = writerFactory.createWriter(getLogger(), writeSchema, outStream);
-                    writer.beginRecordSet();
 
                     final List<HashMap<String, String>> listOfMaps = new ArrayList<HashMap<String, String>>();
                     final HashMap<String, String> values = new HashMap<>();
                     final String[] fieldsArray = fields.split(",");
-                    //Bloque while tiene pruebas y comentadas
-                    while ((record = reader.nextRecord()) != null) {
-                        listOfMaps.clear();
-                        values.clear();
-                        //Mantiene el historico y mapea los campos indicados por paramentro en el history
-                        createHistory(fieldsArray, record, listOfMaps, values, record.getValue("History"), logger);
-                        record.incorporateInactiveFields();//Incorpora nuevo campos al esquema inferido
-                        record.setValue("History", listOfMaps);
-                        writer.write(record);
+
+                    record = reader.nextRecord();//firstRecord
+
+                    // We want to transform the first record before creating the Record Writer. We do this because the Record will likely end up with a different structure
+                    // and therefore a difference Schema after being transformed. As a result, we want to transform the Record and then provide the transformed schema to the
+                    // Record Writer so that if the Record Writer chooses to inherit the Record Schema from the Record itself, it will inherit the transformed schema, not the
+                    // schema determined by the Record Reader.
+
+                    if (record != null) {
+                        final RecordSchema writeSchema;
+
+                        if (!record.getSchema().getField("History").isPresent()) {
+                            getLogger().debug("History field is not present");
+                            Record newRecordScheme = createNewSchemeRecord(fieldsArray, record, listOfMaps, values);
+                            writeSchema = writerFactory.getSchema(null, newRecordScheme.getSchema());
+                        } else {
+                            writeSchema = writerFactory.getSchema(null, record.getSchema());
+                        }
+
+                        RecordSetWriter writer = writerFactory.createWriter(getLogger(), writeSchema, outStream);
+                        writer.beginRecordSet();
+
+                        //Bloque while tiene pruebas y comentadas
+                        while (record != null) {
+                            listOfMaps.clear();
+                            values.clear();
+                            //Mantiene el historico y mapea los campos indicados por paramentro en el history
+                            createHistory(fieldsArray, record, listOfMaps, values, record.getValue("History"), logger);
+                            record.setValue("History", listOfMaps);
+                            writer.write(record);
+                            record = reader.nextRecord();
+                        }
+
+                        final WriteResult writeResult = writer.finishRecordSet();
+                        writer.close();
+
+                        final Map<String, String> attributes = new HashMap<>();
+                        attributes.put("record.count", String.valueOf(writeResult.getRecordCount()));
+                        attributes.put(CoreAttributes.MIME_TYPE.key(), writer.getMimeType());
+                        session.putAllAttributes(outFlowFile, attributes);
+                        session.transfer(outFlowFile, REL_SUCCESS);
+                    } else {
+                        throw new ProcessException("No content");
                     }
-                    final WriteResult writeResult = writer.finishRecordSet();
-                    writer.close();
-                    final Map<String, String> attributes = new HashMap<>();
-                    attributes.put("record.count", String.valueOf(writeResult.getRecordCount()));
-                    attributes.put(CoreAttributes.MIME_TYPE.key(), writer.getMimeType());
-                    session.putAllAttributes(outFlowFile, attributes);
-                    session.transfer(outFlowFile, REL_SUCCESS);
                 } catch (final SchemaNotFoundException | MalformedRecordException e) {
                     getLogger().error("SchemaNotFound or MalformedRecordException \n" + e.toString());
                     throw new ProcessException(e);
@@ -166,9 +190,23 @@ public class historyjson extends AbstractProcessor {
         session.remove(flowFile);
     }
 
-    private void createHistory(String[] fields, Record record, final List<HashMap<String, String>> listOfMaps,
+    private final Record createNewSchemeRecord(final String[] fields, final Record record, final List<HashMap<String, String>> listOfMaps,
+                                               final HashMap<String, String> values) {
+        final Map<String, Object> recordMap = (Map<String, Object>) DataTypeUtils.convertRecordFieldtoObject(record, RecordFieldType.RECORD.getRecordDataType(record.getSchema()));
+        for (String s : fields) {
+            values.put(s, null);
+        }
+        listOfMaps.add(values);
+        recordMap.put("History", listOfMaps);
+        final Record updatedRecord = DataTypeUtils.toRecord(recordMap, "r");
+        return updatedRecord;
+    }
+
+    private void createHistory(final String[] fields, Record record, final List<HashMap<String, String>> listOfMaps,
                                final HashMap<String, String> values, Object obj, ComponentLog logger) {
+        getLogger().debug("Creating history...");
         if (obj instanceof Object[] && ((Object[]) obj).length >= 1) {
+            getLogger().debug("History array present in the registry...");
             final Object[] arrayObj = (Object[]) obj;
             for (Object o : arrayObj) {
                 final List<String> tmpList = ((Record) o).getSchema().getFieldNames();
