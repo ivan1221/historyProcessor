@@ -129,39 +129,19 @@ public class historyjson extends AbstractProcessor {
                     final OutputStream outStream = session.write(outFlowFile);
                     final RecordSetWriter writer = writerFactory.createWriter(getLogger(), writeSchema, outStream);
                     writer.beginRecordSet();
-                    // esto es solo para una prueba con schema
-                    final SchemaIdentifier schemaIdentifier = SchemaIdentifier.builder().id(123456L).version(1).build();
-                    createRecordSchema(schemaIdentifier);
+
                     final List<HashMap<String, String>> listOfMaps = new ArrayList<HashMap<String, String>>();
                     final HashMap<String, String> values = new HashMap<>();
+                    final String[] fieldsArray = fields.split(",");
                     //Bloque while tiene pruebas y comentadas
                     while ((record = reader.nextRecord()) != null) {
                         listOfMaps.clear();
                         values.clear();
-                        //getLogger().error( "#### Valor: " + record.getAsArray( "History" ));
-                        List value = Arrays.asList(record.toMap());
-                        //getLogger().info( "#### value: " + Arrays.toString( record.getAsArray( "History" ) ) );
-                        getLogger().info("#### VALUES: " + value);
-                        //record.setMapValue( "History","E_Formatted","123456" );
-                        //record.setArrayValue( "History",3,"[{E_Formatted_Date=12345, E_Error_Description=Account not found , E_Formatted=E, E_Error_Code=987}]" );
-                        getLogger().info("#### value: " + record.getAsString("History"));
-                        String[] src = {"MapRecord[{E_Formatted=E, E_Error_Code=987}]", "MapRecord[{E_Formatted=E, E_Error_Code=987}]"};
-
-                        //final Object childObject = record.getValue("History");
-                        //final Record firstChildRecord = (Record) childObject;
-
-                        //record.setArrayValue( "History",0,src);
-                        getLogger().info("#### VALUES ORIGINAL: " + record.getValue("History"));
-
-                        //List<Object> val = value == null ? null : Arrays.asList( value );
-                        //getLogger().info( "#### List: " + val);
-
                         //Mantiene el historico y mapea los campos indicados por paramentro en el history
-                        createHistory(fields, record, listOfMaps, values, logger);
+                        createHistory(fieldsArray, record, listOfMaps, values, record.getValue("History"), logger);
+                        record.incorporateInactiveFields();//Incorpora nuevo campos al esquema inferido
                         record.setValue("History", listOfMaps);
-                        getLogger().info("#### VALUES: " + record.getValue("History"));
                         writer.write(record);
-
                     }
                     final WriteResult writeResult = writer.finishRecordSet();
                     writer.close();
@@ -186,16 +166,21 @@ public class historyjson extends AbstractProcessor {
         session.remove(flowFile);
     }
 
-    private void createHistory(String fields, Record record, final List<HashMap<String, String>> listOfMaps,
-                               final HashMap<String, String> values, ComponentLog logger) {
-
-        if(record.getSchema().getField("History").isPresent()){
-            //JSONObject jsonObjArray = new JSONObject(record.getValue("History"));
-            logger.warn("NADAAAAA");
+    private void createHistory(String[] fields, Record record, final List<HashMap<String, String>> listOfMaps,
+                               final HashMap<String, String> values, Object obj, ComponentLog logger) {
+        if (obj instanceof Object[] && ((Object[]) obj).length >= 1) {
+            final Object[] arrayObj = (Object[]) obj;
+            for (Object o : arrayObj) {
+                final List<String> tmpList = ((Record) o).getSchema().getFieldNames();
+                final HashMap<String, String> tmp = new HashMap<>();
+                for (final String key : tmpList) {
+                    tmp.put(key, ((Record) o).getAsString(key));
+                }
+                listOfMaps.add(tmp);
+            }
         }
-
-        String[] array = fields.split(",");
-        for (String s : array) {
+        //current value mapping
+        for (String s : fields) {
             values.put(s, record.getValue(s).toString());
         }
         listOfMaps.add(values);
