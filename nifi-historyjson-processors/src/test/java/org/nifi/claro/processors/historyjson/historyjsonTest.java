@@ -16,6 +16,7 @@
  */
 package org.nifi.claro.processors.historyjson;
 
+import org.apache.nifi.csv.CSVReader;
 import org.apache.nifi.json.JsonRecordSetWriter;
 import org.apache.nifi.json.JsonTreeReader;
 import org.apache.nifi.reporting.InitializationException;

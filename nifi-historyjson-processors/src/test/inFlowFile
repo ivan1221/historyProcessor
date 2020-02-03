@@ -75,10 +75,5 @@
   "O_Concept" : "",
   "O_Virtual_Cdr" : "",
   "O_ID" : "",
-    "History" : [{
-      "E_Formatted" : "E",
-      "E_Error_Code" : "700",
-      "E_Formatted_Date" : "1580140026000",
-      "E_Error_Description" : "Record malformed"
-    } ]
+    "History" : []
 }]

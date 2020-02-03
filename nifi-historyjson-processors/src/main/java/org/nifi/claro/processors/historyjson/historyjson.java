@@ -156,7 +156,7 @@ public class historyjson extends AbstractProcessor {
                         while (record != null) {
                             listOfMaps.clear();
                             values.clear();
-                            createHistory(fieldsArray, record, listOfMaps, values, record.getValue("History"), logger);
+                            createHistory(fieldsArray, record, listOfMaps, values, record.getValue("History"));
                             record.setValue("History", listOfMaps);
                             writer.write(record);
                             record = reader.nextRecord();
@@ -202,7 +202,7 @@ public class historyjson extends AbstractProcessor {
     }
 
     private void createHistory(final String[] fields, Record record, final List<HashMap<String, String>> listOfMaps,
-                               final HashMap<String, String> values, Object obj, ComponentLog logger) {
+                               final HashMap<String, String> values, Object obj) {
         getLogger().debug("Creating history...");
         if (obj instanceof Object[] && ((Object[]) obj).length >= 1) {
             getLogger().debug("History array present in the registry...");
